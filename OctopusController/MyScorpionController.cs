@@ -86,6 +86,7 @@ namespace OctopusController
         {
             if (isPlaying == true)
             {
+                //Play animation only for 5 seconds
                 currentTime += Time.deltaTime;
                 if (currentTime < animDuration)
                 {
@@ -101,7 +102,6 @@ namespace OctopusController
         }
         private void updateLegPos()
         {
-            //check for the distance to the futureBase, then if it's too far away start moving the leg towards the future base position
             for (int j = 0; j < 6; j++)
             {
                 if (Vector3.Distance(_legs[j].Bones[0].position, legFutureBases[j].position) > distanceBetweenFutureBases)
@@ -115,6 +115,7 @@ namespace OctopusController
         //TODO: implement Gradient Descent method to move tail if necessary
         private void updateTail()
         {
+            //Only if tail end position is far away from target and if scorpion arrive to the ball
             if (Vector3.Distance(tailEndEffector.transform.position, tailTarget.transform.position) > threeshold && StartTail)
             {
                 for (int i = 0; i < _tail.Bones.Length - 2; i++)
@@ -122,6 +123,7 @@ namespace OctopusController
                     float slope = 0;
                     if (i == 0)
                     {
+                        //Rotate first tail joint in x and z axis
                         slope = CalculateSlope(_tail.Bones[i], new Vector3(0, 0, 1));
                         _tail.Bones[i].transform.Rotate((new Vector3(0, 0, 1) * -slope) * tailRate);
                         slope = CalculateSlope(_tail.Bones[i], new Vector3(1, 0, 0));
@@ -129,6 +131,8 @@ namespace OctopusController
                     }
                     else
                     {
+                        //Rotate the other joints in only x axis
+
                         slope = CalculateSlope(_tail.Bones[i], new Vector3(1, 0, 0));
                         _tail.Bones[i].transform.Rotate((new Vector3(1, 0, 0) * -slope) * tailRate);
 
@@ -149,7 +153,6 @@ namespace OctopusController
         //TODO: implement fabrik method to move legs 
         private void updateLegs(int idPata)
         {
-            // Save the position of the bones in copy
             for (int i = 0; i <= _legs[idPata].Bones.Length - 1; i++)
             {
                 jointsController[i] = _legs[idPata].Bones[i].position;
@@ -165,6 +168,7 @@ namespace OctopusController
 
                 while (Vector3.Distance(jointsController[jointsController.Length - 1], legTargets[idPata].position) != 0 || Vector3.Distance(jointsController[0], _legs[idPata].Bones[0].position) != 0)
                 {
+                    //From target to base
                     jointsController[jointsController.Length - 1] = legTargets[idPata].position;
                     for (int i = _legs[idPata].Bones.Length - 2; i >= 0; i--)
                     {
@@ -173,6 +177,7 @@ namespace OctopusController
                         jointsController[i] = jointsController[i + 1] - movementVector;
                     }
 
+                    //From base to target
                     jointsController[0] = _legs[idPata].Bones[0].position;
                     for (int i = 1; i < _legs[idPata].Bones.Length - 1; i++)
                     {
@@ -183,6 +188,7 @@ namespace OctopusController
                     }
                 }
 
+                //Set leg bones rotation 
                 for (int i = 0; i <= _legs[idPata].Bones.Length - 2; i++)
                 {
                     Vector3 direction = (jointsController[i + 1] - jointsController[i]).normalized;
