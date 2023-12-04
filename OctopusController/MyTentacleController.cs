@@ -1,101 +1,71 @@
-﻿using System;
+﻿using OctopusController;
+using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
-using System.Text;
 using UnityEngine;
 
-
-
-
-namespace OctopusController
+internal class MyTentacleController
 {
+    TentacleMode tentacleMode;
+    Transform[] _bones;
+    public Transform _endEffectorSphere;
+    bool debug = false;
 
+    public Transform[] Bones { get => _bones; }
 
-    internal class MyTentacleController
-
+    public Transform[] LoadTentacleJoints(Transform root, TentacleMode mode)
     {
+        tentacleMode = mode;
 
-        TentacleMode tentacleMode;
-        Transform[] _bones;
-        public Transform endEffector;
-
-        public Transform[] Bones { get => _bones; }
-
-        void LoadLeg(Transform root)
+        switch (tentacleMode)
         {
-            List<Transform> joints = new List<Transform>();
+            case TentacleMode.LEG:
+                _bones = GetAllJointsFromRoot(root, "Joint");
+                _endEffectorSphere = GetTransformByName(root, "EndEffector");
+                break;
 
-            Transform current = root;
+            case TentacleMode.TAIL:
 
-            current = root.GetChild(0);
-            joints.Add(current);
-            while (current.name != "Joint2")
-            {
-                current = current.GetChild(1);
-                joints.Add(current);
+                _bones = GetAllJointsFromRoot(root, "joint_");
+                _endEffectorSphere = GetTransformByName(root, "EndEffector");
 
-            }
-            //Load endEffector inside bones array to make update calculations easier
-            current = current.GetChild(1);
-            joints.Add(current);
+                break;
 
-            _bones = joints.ToArray();
+            case TentacleMode.TENTACLE:
 
+                _bones = GetAllJointsFromRoot(root, "Bone.", "end");
+                _endEffectorSphere = GetTransformByName(root, "Bone.001_end");
+
+                break;
         }
-        void LoadTail(Transform root)
+        return Bones;
+    }
+    Transform GetTransformByName(Transform root, string name)
+    {
+        Transform child = root.GetComponentsInChildren<Transform>(true)
+                             .FirstOrDefault(t => t.name.StartsWith(name));
+        if (debug)
+            if (child != null)
+                Debug.Log("Loaded " + name);
+            else
+                Debug.Log("Loaded null instead of " + name);
+
+        return child;
+    }
+
+    Transform[] GetAllJointsFromRoot(Transform root, string name, string end = null)
+    {
+        Transform[] allJoints = root.GetComponentsInChildren<Transform>(true);
+
+        IEnumerable<Transform> joints = allJoints.Where(t => t.name.StartsWith(name));
+        if (end != null)
         {
-            List<Transform> joints = new List<Transform>();
-
-            Transform current = root;
-            joints.Add(current);
-            while (current.GetChild(1).name != "EndEffector")
-            {
-                current = current.GetChild(1);
-                joints.Add(current);
-            }
-            endEffector = current.GetChild(1);
-            _bones = joints.ToArray();
-
+            joints = joints.Where(t => !t.name.EndsWith(end));
         }
-        void LoadTentacle(Transform root)
-        {
-            List<Transform> joints = new List<Transform>();
+        if (debug)
+            Debug.Log("Loaded transforms with name: " + string.Join(", ", joints.Select(t => t.name)));
 
-            Transform current = root;
-
-            while (current.name != "Bone.001_end")
-            {
-                current = current.GetChild(0);
-                joints.Add(current);
-            }
-
-            _bones = joints.ToArray();
-
-        }
-        //Exercise 1.
-        public Transform[] LoadTentacleJoints(Transform root, TentacleMode mode)
-        {
-            //TODO: add here whatever is needed to find the bones forming the tentacle for all modes
-            tentacleMode = mode;
-            switch (tentacleMode)
-            {
-                case TentacleMode.LEG:
-                    //TODO: in _endEffectorsphere you keep a reference to the base of the leg
-                    LoadLeg(root);
-
-                    break;
-                case TentacleMode.TAIL:
-                    //TODO: in _endEffectorsphere you keep a reference to the red sphere 
-                    LoadTail(root);
-                    break;
-                case TentacleMode.TENTACLE:
-                    //TODO: in _endEffectorphere you  keep a reference to the sphere with a collider attached to the endEffector
-                    LoadTentacle(root);
-
-
-                    break;
-            }
-            return Bones;
-        }
+        return joints.ToArray();
     }
 }

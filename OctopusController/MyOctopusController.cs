@@ -19,6 +19,7 @@ namespace OctopusController
 
         Transform[] _randomTargets;
 
+        int tentacle;
 
         float _twistMin, _twistMax;
         float _swingMin, _swingMax;
@@ -65,6 +66,14 @@ namespace OctopusController
         public void NotifyTarget(Transform target, Transform region)
         {
             _currentRegion = region;
+
+            for(int i = 0; i < _randomTargets.Length; i++)
+            {
+                if(Vector3.Distance(_currentRegion.GetChild(0).position, _randomTargets[i].position) <0.01f )
+                {
+                    tentacle = i;
+                }
+            }
             _target = target;
         }
 
@@ -113,9 +122,20 @@ namespace OctopusController
                 for (int j = _tentacles[i].Bones.Length - 2; j >= 0; j--)
                 {
                     Vector3 direction1 = _tentacles[i].Bones[_tentacles[i].Bones.Length - 1].transform.position - _tentacles[i].Bones[j].transform.position;
+                    Vector3 direction2;
+                    if (isShooting)
+                    {
+                        if(i == tentacle)
+                            direction2 = _target.position - _tentacles[i].Bones[j].transform.position;
+                        else
+                            direction2 = _randomTargets[i].transform.position - _tentacles[i].Bones[j].transform.position;
 
+                    }
+                    else
+                    {
+                        direction2 = _randomTargets[i].transform.position - _tentacles[i].Bones[j].transform.position;
 
-                    Vector3 direction2 = _randomTargets[i].transform.position - _tentacles[i].Bones[j].transform.position;
+                    }
 
 
                     _cos[j] = Vector3.Dot(direction1, direction2) / (direction1.magnitude * direction2.magnitude);

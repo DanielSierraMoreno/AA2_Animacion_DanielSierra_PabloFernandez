@@ -43,8 +43,8 @@ namespace OctopusController
                 legTargets[i] = LegTargets[i];
                 //TODO: initialize anything needed for the FABRIK implementation
             }
-            distancesBetweenJoints = new float[_legs[0].Bones.Length - 1];
-            jointsController = new Vector3[_legs[0].Bones.Length];
+            distancesBetweenJoints = new float[_legs[0].Bones.Length];
+            jointsController = new Vector3[_legs[0].Bones.Length+1];
         }
 
         public void InitTail(Transform TailBase)
@@ -53,7 +53,7 @@ namespace OctopusController
             _tail.LoadTentacleJoints(TailBase, TentacleMode.TAIL);
             //TODO: Initialize anything needed for the Gradient Descent implementation
 
-            tailEndEffector = _tail.endEffector;
+            tailEndEffector = _tail._endEffectorSphere;
         }
 
         //TODO: Check when to start the animation towards target and implement Gradient Descent method to move the joints.
@@ -106,7 +106,7 @@ namespace OctopusController
             {
                 if (Vector3.Distance(_legs[j].Bones[0].position, legFutureBases[j].position) > distanceBetweenFutureBases)
                 {
-                    _legs[j].Bones[0].position = Vector3.Lerp(_legs[j].Bones[0].position, legFutureBases[j].position, 1.4f);
+                    _legs[j].Bones[0].position = Vector3.Lerp(_legs[j].Bones[0].position, legFutureBases[j].position, 1f);
                 }
                 updateLegs(j);
             }
@@ -120,28 +120,28 @@ namespace OctopusController
             {
                 for (int i = 0; i < _tail.Bones.Length - 2; i++)
                 {
-                    float slope = 0;
+                    float rotation = 0;
                     if (i == 0)
                     {
                         //Rotate first tail joint in x and z axis
-                        slope = CalculateSlope(_tail.Bones[i], new Vector3(0, 0, 1));
-                        _tail.Bones[i].transform.Rotate((new Vector3(0, 0, 1) * -slope) * tailRate);
-                        slope = CalculateSlope(_tail.Bones[i], new Vector3(1, 0, 0));
-                        _tail.Bones[i].transform.Rotate((new Vector3(1, 0, 0) * -slope) * tailRate);
+                        rotation = CalculateRotation(_tail.Bones[i], new Vector3(0, 0, 1));
+                        _tail.Bones[i].transform.Rotate((new Vector3(0, 0, 1) * -rotation) * tailRate);
+                        rotation = CalculateRotation(_tail.Bones[i], new Vector3(1, 0, 0));
+                        _tail.Bones[i].transform.Rotate((new Vector3(1, 0, 0) * -rotation) * tailRate);
                     }
                     else
                     {
                         //Rotate the other joints in only x axis
 
-                        slope = CalculateSlope(_tail.Bones[i], new Vector3(1, 0, 0));
-                        _tail.Bones[i].transform.Rotate((new Vector3(1, 0, 0) * -slope) * tailRate);
+                        rotation = CalculateRotation(_tail.Bones[i], new Vector3(1, 0, 0));
+                        _tail.Bones[i].transform.Rotate((new Vector3(1, 0, 0) * -rotation) * tailRate);
 
                     }
 
                 }
             }
         }
-        private float CalculateSlope(Transform actualJoint, Vector3 axis)
+        private float CalculateRotation(Transform actualJoint, Vector3 axis)
         {
             float distance = Vector3.Distance(tailEndEffector.transform.position, tailTarget.transform.position);
             actualJoint.transform.Rotate(axis * 0.01f);
@@ -153,51 +153,75 @@ namespace OctopusController
         //TODO: implement fabrik method to move legs 
         private void updateLegs(int idPata)
         {
-            for (int i = 0; i <= _legs[idPata].Bones.Length - 1; i++)
-            {
-                jointsController[i] = _legs[idPata].Bones[i].position;
-            }
-            for (int i = 0; i <= _legs[idPata].Bones.Length - 2; i++)
-            {
-                distancesBetweenJoints[i] = Vector3.Distance(_legs[idPata].Bones[i].position, _legs[idPata].Bones[i + 1].position);
-            }
+
+            SetParameters(idPata);
 
             float targetToRoot = Vector3.Distance(jointsController[0], legTargets[idPata].position);
             if (targetToRoot < distancesBetweenJoints.Sum())
             {
 
-                while (Vector3.Distance(jointsController[jointsController.Length - 1], legTargets[idPata].position) != 0 || Vector3.Distance(jointsController[0], _legs[idPata].Bones[0].position) != 0)
-                {
-                    //From target to base
-                    jointsController[jointsController.Length - 1] = legTargets[idPata].position;
-                    for (int i = _legs[idPata].Bones.Length - 2; i >= 0; i--)
-                    {
-                        Vector3 vectorDirector = (jointsController[i + 1] - jointsController[i]).normalized;
-                        Vector3 movementVector = vectorDirector * distancesBetweenJoints[i];
-                        jointsController[i] = jointsController[i + 1] - movementVector;
-                    }
-
-                    //From base to target
-                    jointsController[0] = _legs[idPata].Bones[0].position;
-                    for (int i = 1; i < _legs[idPata].Bones.Length - 1; i++)
-                    {
-                        Vector3 vectorDirector = (jointsController[i - 1] - jointsController[i]).normalized;
-                        Vector3 movementVector = vectorDirector * distancesBetweenJoints[i - 1];
-                        jointsController[i] = jointsController[i - 1] - movementVector;
-
-                    }
-                }
+                CalculateRotations(idPata);
 
                 //Set leg bones rotation 
-                for (int i = 0; i <= _legs[idPata].Bones.Length - 2; i++)
-                {
-                    Vector3 direction = (jointsController[i + 1] - jointsController[i]).normalized;
-                    Vector3 antDir = (_legs[idPata].Bones[i + 1].position - _legs[idPata].Bones[i].position).normalized;
-                    Quaternion rot = Quaternion.FromToRotation(antDir, direction);
-                    _legs[idPata].Bones[i].rotation = rot * _legs[idPata].Bones[i].rotation;
-                }
+
+                RotateLegs(idPata);
             }
             #endregion
+        }
+
+        void SetParameters(int id)
+        {
+            for (int i = 0; i <= _legs[id].Bones.Length - 1; i++)
+            {
+                jointsController[i] = _legs[id].Bones[i].position;
+            }
+            jointsController[_legs[id].Bones.Length] = _legs[id]._endEffectorSphere.position;
+
+            for (int i = 0; i <= _legs[id].Bones.Length - 2; i++)
+            {
+                distancesBetweenJoints[i] = Vector3.Distance(_legs[id].Bones[i].position, _legs[id].Bones[i + 1].position);
+            }
+            distancesBetweenJoints[_legs[id].Bones.Length - 1] = Vector3.Distance(_legs[id].Bones[_legs[id].Bones.Length - 1].position, _legs[id]._endEffectorSphere.position);
+        }
+        void CalculateRotations(int id)
+        {
+            while (Vector3.Distance(jointsController[jointsController.Length - 1], legTargets[id].position) != 0 || Vector3.Distance(jointsController[0], _legs[id].Bones[0].position) != 0)
+            {
+                //From target to base
+                jointsController[jointsController.Length - 1] = legTargets[id].position;
+                for (int i = jointsController.Length - 2; i >= 0; i--)
+                {
+                    Vector3 vectorDirector = (jointsController[i + 1] - jointsController[i]).normalized;
+                    Vector3 movementVector = vectorDirector * distancesBetweenJoints[i];
+                    jointsController[i] = jointsController[i + 1] - movementVector;
+                }
+
+                //From base to target
+                jointsController[0] = _legs[id].Bones[0].position;
+                for (int i = 1; i < jointsController.Length - 1; i++)
+                {
+                    Vector3 vectorDirector = (jointsController[i - 1] - jointsController[i]).normalized;
+                    Vector3 movementVector = vectorDirector * distancesBetweenJoints[i - 1];
+                    jointsController[i] = jointsController[i - 1] - movementVector;
+
+                }
+            }
+        }
+
+        void RotateLegs(int id)
+        {
+            for (int i = 0; i <= jointsController.Length - 2; i++)
+            {
+                Vector3 direction = (jointsController[i + 1] - jointsController[i]).normalized;
+                Vector3 antDir;
+                if (i + 1 >= _legs[id].Bones.Length)
+                    antDir = (_legs[id]._endEffectorSphere.position - _legs[id].Bones[i].position).normalized;
+                else
+                    antDir = (_legs[id].Bones[i + 1].position - _legs[id].Bones[i].position).normalized;
+
+                Quaternion rot = Quaternion.FromToRotation(antDir, direction);
+                _legs[id].Bones[i].rotation = rot * _legs[id].Bones[i].rotation;
+            }
         }
     }
 
